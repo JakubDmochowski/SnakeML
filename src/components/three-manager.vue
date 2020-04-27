@@ -6,38 +6,58 @@
 import * as THREE from 'three'
 import map from '../logic/Map'
 import Snake from '../logic/Snake'
-import Direction from '../logic/Direction'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 export default {
   data: () => ({
     renderer: null,
     map: null,
-    loopsPerSecond: 2
+    camera: null,
+    loopsPerSecond: 1,
+    initialized: false,
+    lastLoop: 0
   }),
   mounted () {
-    this.map = map
-    this.snake = new Snake()
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.$refs.three })
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.onLoop()
-    window.addEventListener('resize', this.handleResize)
-    window.addEventListener('keydown', this.handleKeyDown)
+    if (!this.initialized) {
+      this.initialized = true
+
+      this.map = map
+      this.camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        2,
+        1000
+      )
+      this.camera.position.z = 8
+      this.camera.position.y = 7
+      this.camera.position.x = 3
+      this.snake = new Snake()
+      this.map.scene.add(this.snake.cameraHelper)
+      this.renderer = new THREE.WebGLRenderer({ canvas: this.$refs.three })
+      this.renderer.setSize(window.innerWidth, window.innerHeight)
+      this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+      this.onLoop()
+      window.addEventListener('resize', this.handleResize)
+      window.addEventListener('keydown', this.handleKeyDown)
+    }
   },
   beforeDestroy () {
     window.removeEventListener('resize', this.handleResize)
     window.removeEventListener('keydown', this.handleKeyDown)
   },
   methods: {
-    onRender (time) {
-      requestAnimationFrame(this.onRender)
-      this.renderer.render(this.map.scene, this.map.camera)
+    onRender () {
+      this.renderer.render(this.map.scene, this.camera)
     },
-    onLoop () {
-      this.snake.onLoop()
+    onLoop (time) {
+      const currLoop = Math.floor(time / (1000 / this.loopsPerSecond))
+      while (this.lastLoop < currLoop) {
+        this.lastLoop++
+        this.snake.onLogicLoop()
+      }
+      this.snake.onGraphicLoop()
       this.onRender()
-      window.setTimeout(() => {
-        this.onLoop()
-      }, 1000 / this.loopsPerSecond)
+      requestAnimationFrame(this.onLoop)
     },
     handleResize () {
       this.renderer.setSize(
@@ -48,18 +68,16 @@ export default {
     handleKeyDown (event) {
       switch (event.keyCode) {
         case 38:
-          this.snake.requestDirection(Direction.up)
+          this.snake.requestRotation('up')
           break
         case 40:
-          this.snake.requestDirection(Direction.down)
+          this.snake.requestRotation('down')
           break
         case 37:
-          this.snake.requestDirection(Direction.left)
-          this.loopsPerSecond = 2
+          this.snake.requestRotation('left')
           break
         case 39:
-          this.snake.requestDirection(Direction.right)
-          this.loopsPerSecond = 5
+          this.snake.requestRotation('right')
           break
       }
     }
