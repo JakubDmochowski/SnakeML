@@ -6,6 +6,7 @@
 import * as THREE from 'three'
 import map from '../logic/Map'
 import Snake from '../logic/Snake'
+import Apple from '../logic/Apple'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 export default {
@@ -13,7 +14,7 @@ export default {
     renderer: null,
     map: null,
     camera: null,
-    loopsPerSecond: 1,
+    loopsPerSecond: 2,
     initialized: false,
     lastLoop: 0
   }),
@@ -32,13 +33,14 @@ export default {
       this.camera.position.y = 7
       this.camera.position.x = 3
       this.snake = new Snake()
+      this.apple = new Apple()
       this.map.scene.add(this.snake.cameraHelper)
       this.renderer = new THREE.WebGLRenderer({ canvas: this.$refs.three })
       this.renderer.setSize(window.innerWidth, window.innerHeight)
       this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-      this.onLoop()
       window.addEventListener('resize', this.handleResize)
       window.addEventListener('keydown', this.handleKeyDown)
+      this.onLoop()
     }
   },
   beforeDestroy () {
@@ -47,7 +49,7 @@ export default {
   },
   methods: {
     onRender () {
-      this.renderer.render(this.map.scene, this.camera)
+      this.renderer.render(this.map.scene, this.snake.camera)
     },
     onLoop (time) {
       const currLoop = Math.floor(time / (1000 / this.loopsPerSecond))

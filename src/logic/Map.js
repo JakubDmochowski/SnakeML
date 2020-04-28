@@ -1,42 +1,41 @@
 import * as THREE from 'three'
 
-const maxMapHeight = 20
-const maxMapWidth = 20
-const maxMapDepth = 20
-
 class Map {
   constructor () {
     this.scene = new THREE.Scene()
+    this.maxMapHeight = 20
+    this.maxMapWidth = 20
+    this.maxMapDepth = 20
     this.createBorders()
   }
 
   getMapX (x) {
-    return x - maxMapWidth / 2
+    return x - this.maxMapWidth / 2
   }
 
   getMapY (y) {
-    return y - maxMapHeight / 2
+    return y - this.maxMapHeight / 2
   }
 
   getMapZ (z) {
-    return z - maxMapDepth / 2
+    return z - this.maxMapDepth / 2
   }
 
   createBorders () {
     let x = 0
     let y = 0
     let z = 0
-    for (y = 0; y < maxMapHeight; y++) {
-      for (x = 0; x < maxMapWidth; x++) {
-        for (z = 0; z < maxMapDepth; z++) {
-          if (!x || !y || !z || y === maxMapHeight - 1 || x === maxMapWidth - 1 || z === maxMapDepth - 1) {
+    for (y = 0; y < this.maxMapHeight; y++) {
+      for (x = 0; x < this.maxMapWidth; x++) {
+        for (z = 0; z < this.maxMapDepth; z++) {
+          if (!x || !y || !z || y === this.maxMapHeight - 1 || x === this.maxMapWidth - 1 || z === this.maxMapDepth - 1) {
             if (!((x + y + z) % 6)) {
               const geometry = new THREE.BoxGeometry()
               const material = new THREE.MeshBasicMaterial({
                 color: new THREE.Color(
-                  x * 255 / maxMapWidth,
-                  y * 255 / maxMapHeight,
-                  z * 255 / maxMapDepth
+                  x * 255 / this.maxMapWidth,
+                  y * 255 / this.maxMapHeight,
+                  z * 255 / this.maxMapDepth
                 ),
                 wireframe: true
               })
