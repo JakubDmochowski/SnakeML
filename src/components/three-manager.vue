@@ -34,10 +34,10 @@ export default {
       this.camera.position.y = 7
       this.camera.position.x = 3
       this.camera.layers.enableAll()
-      this.snake = new Snake()
-      this.apple = new Apple()
+      this.camera.updateProjectionMatrix()
+      this.snake = new Snake(this.map)
+      this.apple = new Apple(this.map)
       this.apple.relocate()
-      this.map.scene.add(this.snake.cameraHelper)
       this.renderer = new THREE.WebGLRenderer({ canvas: this.$refs.three })
       this.renderer.setSize(window.innerWidth, window.innerHeight)
       this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -64,23 +64,26 @@ export default {
         while (this.lastLoop < currLoop) {
           this.lastLoop++
           try {
-            this.snake.onLogicLoop()
+            this.snake.onLoop()
           } catch (error) {
             this.gameover = true
             console.log(error)
           }
         }
-        this.snake.onGraphicLoop()
+        this.snake.onRender()
         this.onRender({ camera: this.snake.camera })
       } else {
         this.onRender({ camera: this.camera })
       }
     },
     handleResize () {
+      this.camera.aspect = window.innerWidth / window.innerHeight
+      this.camera.updateProjectionMatrix()
       this.renderer.setSize(
         window.innerWidth,
         window.innerHeight
       )
+      this.snake.onResize()
     },
     handleKeyDown (event) {
       switch (event.keyCode) {

@@ -1,26 +1,23 @@
-import SnakeElement from './SnakeElement'
 import Apple from './Apple'
-import map from './Map'
 import * as THREE from 'three'
 import Direction from './Direction'
 
 class Snake {
-  constructor () {
+  constructor (map) {
+    this.map = () => map
     this.camera = new THREE.PerspectiveCamera(
       90,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     )
-    this.camera.updateProjectionMatrix()
     this.cameraHelper = new THREE.CameraHelper(this.camera)
     this.cameraHelper.layers.enableAll()
     this.cameraHelper.layers.disable(0)
     this.cameraHelper.layers.disable(1)
-    this.head = null
-    this.tail = null
-    this.size = 1
-    this.maxSize = 3
+    this.camera.updateProjectionMatrix()
+    this.elements = []
+    this.maxSize = 4
     this.createSnakeElement()
     this.direction = Direction.up
     this.normal = Direction.backward
@@ -30,25 +27,42 @@ class Snake {
     this.targetNormal = null
     this.requestedRotation = null
     this.animationSpeed = 15 / 100
+    this.normalDirectionHelper = new THREE.ArrowHelper(this.normal, this.getHead().position, 2, 0x0000ff)
+    this.directionHelper = new THREE.ArrowHelper(this.direction, this.getHead().position, 2, 0x00ff00)
+    this.normalDirectionHelper.traverse(function (node) { node.layers.set(1) })
+    this.directionHelper.traverse(function (node) { node.layers.set(1) })
+    this.map().scene.add(this.normalDirectionHelper)
+    this.map().scene.add(this.directionHelper)
+    this.map().scene.add(this.cameraHelper)
+  }
+
+  onResize () {
+    this.camera.aspect = window.innerWidth / window.innerHeight
+    this.camera.updateProjectionMatrix()
   }
 
   createSnakeElement (matrix = null) {
-    const geometry = !this.head ? new THREE.ConeGeometry(0.5, 1, 4) : new THREE.BoxGeometry(0.75, 0.75, 0.75)
+    const geometry = !this.elements.length ? new THREE.ConeGeometry(0.5, 1, 4) : new THREE.BoxGeometry(0.75, 0.75, 0.75)
     const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
     var mesh = new THREE.Mesh(geometry, material)
+    mesh.userData = {
+      snake: this,
+      uuid: mesh.uuid
+    }
     if (matrix) {
       mesh.matrixAutoUpdate = false
       mesh.matrix.copy(matrix)
     }
-    if (!this.head) {
-      mesh.layers.set(1)
-      this.head = new SnakeElement(mesh)
-      this.tail = this.head
+    if (!this.elements.length) {
+      mesh.layers.disableAll()
+      mesh.layers.enable(1)
+      material.color = new THREE.Color(0xff0000)
     } else {
-      this.tail.next = new SnakeElement(mesh)
-      this.tail = this.tail.next
+      mesh.layers.disableAll()
+      mesh.layers.enable(0)
     }
-    map.scene.add(mesh)
+    this.elements.push(mesh.uuid)
+    this.map().scene.add(mesh)
   }
 
   requestRotation (rotation) {
@@ -73,13 +87,20 @@ class Snake {
     }
   }
 
+  getHead () {
+    return this.getElem(0)
+  }
+
+  getElem (index) {
+    return this.map().scene.children.find(c => c.uuid === this.elements[index])
+  }
+
   checkCollision () {
-    const pos = this.head.mesh.position.clone().add(this.direction.clone().negate())
-    const raycaster = new THREE.Raycaster(pos, this.direction, 0, 1)
-    const collisions = raycaster.intersectObjects(map.scene.children)
+    const headPos = this.getHead().position
+    const collisions = this.map().scene.children.filter(c => c.position.equals(headPos) && c.uuid !== this.elements[0])
     if (collisions.length) {
-      if (collisions[0].object.userData instanceof Apple) {
-        collisions[0].object.userData.relocate()
+      if (collisions[0].userData instanceof Apple) {
+        collisions[0].userData.relocate()
         this.maxSize += 3
       } else {
         throw Error('gameOver')
@@ -89,11 +110,12 @@ class Snake {
 
   updateTarget (rotation) {
     const { angle, perpendicular } = rotation
+    const head = this.getHead()
     const vector = perpendicular ? this.direction.clone().cross(this.normal).normalize() : this.normal
     this.rotation = new THREE.Quaternion().setFromAxisAngle(vector, angle).normalize()
-    this.targetNormal = perpendicular ? this.normal.clone().applyQuaternion(this.rotation) : this.normal
-    this.targetDirection = this.direction.clone().applyQuaternion(this.rotation)
-    this.targetRotation = this.head.mesh.clone().applyQuaternion(this.rotation).quaternion
+    this.targetNormal = this.roundVector3(perpendicular ? this.normal.clone().applyQuaternion(this.rotation) : this.normal)
+    this.targetDirection = this.roundVector3(this.direction.clone().applyQuaternion(this.rotation))
+    this.targetRotation = head.clone().applyQuaternion(this.rotation).quaternion
   }
 
   roundMatrix (matrix) {
@@ -102,11 +124,18 @@ class Snake {
     }))
   }
 
-  onLogicLoop () {
-    this.checkCollision()
+  roundVector3 (vector) {
+    return new THREE.Vector3(
+      Math.round(vector.x),
+      Math.round(vector.y),
+      Math.round(vector.z)
+    )
+  }
+
+  onLoop () {
     if (this.targetDirection) {
-      this.direction = this.targetDirection.clone()
-      this.normal = this.targetNormal.clone()
+      this.direction = this.targetDirection
+      this.normal = this.targetNormal
       this.targetDirection = null
       this.targetNormal = null
       this.targetRotation = null
@@ -116,59 +145,64 @@ class Snake {
       this.updateTarget(this.requestedRotation)
       this.requestedRotation = null
     }
-    var tmp = this.head
+    const head = this.getHead()
     var nextPos = this.roundMatrix(
       new THREE.Matrix4()
         .compose(
-          tmp.mesh.position.clone().add(this.direction),
-          tmp.mesh.quaternion.normalize(),
+          head.position.clone().add(this.direction),
+          head.quaternion.normalize(),
           new THREE.Vector3(1, 1, 1)
         )
     )
     var prevPos = null
-    while (tmp) {
-      prevPos = tmp.mesh.matrix.clone()
-      tmp.mesh.matrixAutoUpdate = false
-      tmp.mesh.matrix = new THREE.Matrix4()
-      tmp.mesh.applyMatrix4(nextPos)
+    let i = 0
+    let elem = null
+    for (i = 0; i < this.elements.length; i++) {
+      elem = this.getElem(i)
+      prevPos = elem.matrix.clone()
+      elem.matrixAutoUpdate = false
+      elem.matrix = new THREE.Matrix4()
+      elem.applyMatrix4(nextPos)
       nextPos = prevPos.clone()
-      tmp = tmp.next
-      if (tmp) {
-      }
     }
-    if (this.size < this.maxSize) {
-      console.log('new Element at: ', JSON.stringify(prevPos))
+    if (this.elements.length < this.maxSize) {
       this.createSnakeElement(prevPos)
-      this.size++
     }
+    this.checkCollision()
   }
 
   move () {
     if (this.targetDirection) {
-      const angle = this.head.mesh.quaternion.angleTo(this.targetRotation)
+      const head = this.getHead()
+      const angle = head.quaternion.angleTo(this.targetRotation)
       const partialRotation = (new THREE.Quaternion()).rotateTowards(this.rotation, this.animationSpeed * angle)
-      this.head.mesh.applyQuaternion(partialRotation)
+      this.getHead().applyQuaternion(partialRotation)
       this.normal.applyQuaternion(partialRotation)
       this.direction.applyQuaternion(partialRotation)
     }
   }
 
   updateCamera () {
+    const head = this.getHead()
     const lookAt = new THREE.Vector3(
-      this.head.mesh.position.x + this.direction.x,
-      this.head.mesh.position.y + this.direction.y,
-      this.head.mesh.position.z + this.direction.z
+      head.position.x + this.direction.x,
+      head.position.y + this.direction.y,
+      head.position.z + this.direction.z
     )
-    this.camera.position.lerp(this.head.mesh.position, this.animationSpeed)
+    this.camera.position.lerp(head.position, this.animationSpeed)
     this.camera.matrix.lookAt(this.camera.position, lookAt, this.normal)
     this.camera.quaternion.setFromRotationMatrix(this.camera.matrix)
 
+    this.normalDirectionHelper.position.copy(head.position)
+    this.directionHelper.position.copy(head.position)
+    this.normalDirectionHelper.setDirection(this.normal)
+    this.directionHelper.setDirection(this.direction)
     this.cameraHelper.rotation.copy(this.camera.rotation)
     this.cameraHelper.position.copy(this.camera.position)
     this.cameraHelper.matrixAutoUpdate = true
   }
 
-  onGraphicLoop () {
+  onRender () {
     this.move()
     this.updateCamera()
   }
