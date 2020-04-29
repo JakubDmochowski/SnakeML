@@ -4,7 +4,7 @@
 
 <script>
 import * as THREE from 'three'
-import map from '../logic/Map'
+import Map from '../logic/Map'
 import Snake from '../logic/Snake'
 import Apple from '../logic/Apple'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -23,7 +23,7 @@ export default {
     if (!this.initialized) {
       this.initialized = true
 
-      this.map = map
+      this.map = new Map(20, 20, 20)
       this.camera = new THREE.PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,

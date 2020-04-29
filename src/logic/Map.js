@@ -1,58 +1,58 @@
 import * as THREE from 'three'
 
 class Map {
-  constructor () {
+  constructor (width, height, depth) {
     this.scene = new THREE.Scene()
-    this.maxMapHeight = 20
-    this.maxMapWidth = 20
-    this.maxMapDepth = 20
+    this.maxMapWidth = width
+    this.maxMapHeight = height
+    this.maxMapDepth = depth
     this.createBorders()
   }
 
   getMapX (x) {
-    return x - this.maxMapWidth / 2
+    return Math.floor(x - this.maxMapWidth / 2)
   }
 
   getMapY (y) {
-    return y - this.maxMapHeight / 2
+    return Math.floor(y - this.maxMapHeight / 2)
   }
 
   getMapZ (z) {
-    return z - this.maxMapDepth / 2
+    return Math.floor(z - this.maxMapDepth / 2)
   }
 
   getMapBorders () {
     return {
       x: {
-        min: this.getMapX(0),
-        max: this.getMapX(this.maxMapWidth)
+        min: this.getMapX(1),
+        max: this.getMapX(this.maxMapWidth - 1)
       },
       y: {
-        min: this.getMapY(0),
-        max: this.getMapY(this.maxMapHeight)
+        min: this.getMapY(1),
+        max: this.getMapY(this.maxMapHeight - 1)
       },
       z: {
-        min: this.getMapZ(0),
-        max: this.getMapZ(this.maxMapDepth)
+        min: this.getMapZ(1),
+        max: this.getMapZ(this.maxMapDepth - 1)
       }
     }
   }
 
   createBorders () {
-    let x = 0
-    let y = 0
-    let z = 0
-    for (y = 0; y < this.maxMapHeight; y++) {
-      for (x = 0; x < this.maxMapWidth; x++) {
-        for (z = 0; z < this.maxMapDepth; z++) {
-          if (!x || !y || !z || y === this.maxMapHeight - 1 || x === this.maxMapWidth - 1 || z === this.maxMapDepth - 1) {
+    let x = 1
+    let y = 1
+    let z = 1
+    for (y = 1; y < this.maxMapHeight; y++) {
+      for (x = 1; x < this.maxMapWidth; x++) {
+        for (z = 1; z < this.maxMapDepth; z++) {
+          if (x === 1 || y === 1 || z === 1 || y === this.maxMapHeight - 1 || x === this.maxMapWidth - 1 || z === this.maxMapDepth - 1) {
             if (!((x + y + z) % 6)) {
               const geometry = new THREE.BoxGeometry()
               const material = new THREE.MeshBasicMaterial({
                 color: new THREE.Color(
-                  x * 255 / this.maxMapWidth,
-                  y * 255 / this.maxMapHeight,
-                  z * 255 / this.maxMapDepth
+                  x * this.maxMapWidth / 255,
+                  y * this.maxMapHeight / 255,
+                  z * this.maxMapDepth / 255
                 ),
                 wireframe: true
               })
@@ -69,6 +69,4 @@ class Map {
   }
 }
 
-const map = new Map()
-
-export default map
+export default Map
