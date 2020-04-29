@@ -1,4 +1,5 @@
 import SnakeElement from './SnakeElement'
+import Apple from './Apple'
 import map from './Map'
 import * as THREE from 'three'
 import Direction from './Direction'
@@ -13,10 +14,13 @@ class Snake {
     )
     this.camera.updateProjectionMatrix()
     this.cameraHelper = new THREE.CameraHelper(this.camera)
+    this.cameraHelper.layers.enableAll()
+    this.cameraHelper.layers.disable(0)
+    this.cameraHelper.layers.disable(1)
     this.head = null
     this.tail = null
     this.size = 1
-    this.maxSize = 2
+    this.maxSize = 3
     this.createSnakeElement()
     this.direction = Direction.up
     this.normal = Direction.backward
@@ -28,20 +32,20 @@ class Snake {
     this.animationSpeed = 15 / 100
   }
 
-  createSnakeElement (matrix) {
-    const geometry = new THREE.ConeGeometry(1, 2, 3)
+  createSnakeElement (matrix = null) {
+    const geometry = !this.head ? new THREE.ConeGeometry(0.5, 1, 4) : new THREE.BoxGeometry(0.75, 0.75, 0.75)
     const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
     var mesh = new THREE.Mesh(geometry, material)
     if (matrix) {
+      mesh.matrixAutoUpdate = false
       mesh.matrix.copy(matrix)
     }
     if (!this.head) {
+      mesh.layers.set(1)
       this.head = new SnakeElement(mesh)
-      this.head.matrixAutoUpdate = false
       this.tail = this.head
     } else {
       this.tail.next = new SnakeElement(mesh)
-      this.tail.next.matrixAutoUpdate = false
       this.tail = this.tail.next
     }
     map.scene.add(mesh)
@@ -69,17 +73,37 @@ class Snake {
     }
   }
 
+  checkCollision () {
+    const pos = this.head.mesh.position.clone().add(this.direction.clone().negate())
+    const raycaster = new THREE.Raycaster(pos, this.direction, 0, 1)
+    const collisions = raycaster.intersectObjects(map.scene.children)
+    if (collisions.length) {
+      if (collisions[0].object.userData instanceof Apple) {
+        collisions[0].object.userData.relocate()
+        this.maxSize += 3
+      } else {
+        throw Error('gameOver')
+      }
+    }
+  }
+
   updateTarget (rotation) {
     const { angle, perpendicular } = rotation
-    const vector = perpendicular ? this.direction.clone().cross(this.normal) : this.normal
-    this.rotation = new THREE.Quaternion().setFromAxisAngle(vector, angle)
-    this.rotation.normalize()
+    const vector = perpendicular ? this.direction.clone().cross(this.normal).normalize() : this.normal
+    this.rotation = new THREE.Quaternion().setFromAxisAngle(vector, angle).normalize()
     this.targetNormal = perpendicular ? this.normal.clone().applyQuaternion(this.rotation) : this.normal
     this.targetDirection = this.direction.clone().applyQuaternion(this.rotation)
     this.targetRotation = this.head.mesh.clone().applyQuaternion(this.rotation).quaternion
   }
 
+  roundMatrix (matrix) {
+    return new THREE.Matrix4().fromArray(matrix.toArray().map((value) => {
+      return Math.round(value)
+    }))
+  }
+
   onLogicLoop () {
+    this.checkCollision()
     if (this.targetDirection) {
       this.direction = this.targetDirection.clone()
       this.normal = this.targetNormal.clone()
@@ -92,27 +116,29 @@ class Snake {
       this.updateTarget(this.requestedRotation)
       this.requestedRotation = null
     }
-    var prevPosition = this.head.mesh.matrix.clone()
-    var prevPositionParent = null
-
-    this.head.mesh.position.x = this.head.mesh.position.x + this.direction.x
-    this.head.mesh.position.y = this.head.mesh.position.y + this.direction.y
-    this.head.mesh.position.z = this.head.mesh.position.z + this.direction.z
-    var tmp = this.head.next
+    var tmp = this.head
+    var nextPos = this.roundMatrix(
+      new THREE.Matrix4()
+        .compose(
+          tmp.mesh.position.clone().add(this.direction),
+          tmp.mesh.quaternion.normalize(),
+          new THREE.Vector3(1, 1, 1)
+        )
+    )
+    var prevPos = null
     while (tmp) {
-      prevPositionParent = prevPosition
-      prevPosition = new THREE.Vector3(
-        tmp.mesh.position.x,
-        tmp.mesh.position.y,
-        tmp.mesh.position.z
-      )
-      tmp.mesh.position.x = prevPositionParent.x
-      tmp.mesh.position.y = prevPositionParent.y
-      tmp.mesh.position.z = prevPositionParent.z
+      prevPos = tmp.mesh.matrix.clone()
+      tmp.mesh.matrixAutoUpdate = false
+      tmp.mesh.matrix = new THREE.Matrix4()
+      tmp.mesh.applyMatrix4(nextPos)
+      nextPos = prevPos.clone()
       tmp = tmp.next
+      if (tmp) {
+      }
     }
     if (this.size < this.maxSize) {
-      this.createSnakeElement(prevPosition)
+      console.log('new Element at: ', JSON.stringify(prevPos))
+      this.createSnakeElement(prevPos)
       this.size++
     }
   }
@@ -133,8 +159,6 @@ class Snake {
       this.head.mesh.position.y + this.direction.y,
       this.head.mesh.position.z + this.direction.z
     )
-    console.log(JSON.stringify(this.camera.position))
-    console.log(JSON.stringify(this.head.mesh.position))
     this.camera.position.lerp(this.head.mesh.position, this.animationSpeed)
     this.camera.matrix.lookAt(this.camera.position, lookAt, this.normal)
     this.camera.quaternion.setFromRotationMatrix(this.camera.matrix)

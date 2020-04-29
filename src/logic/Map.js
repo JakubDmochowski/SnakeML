@@ -21,6 +21,23 @@ class Map {
     return z - this.maxMapDepth / 2
   }
 
+  getMapBorders () {
+    return {
+      x: {
+        min: this.getMapX(0),
+        max: this.getMapX(this.maxMapWidth)
+      },
+      y: {
+        min: this.getMapY(0),
+        max: this.getMapY(this.maxMapHeight)
+      },
+      z: {
+        min: this.getMapZ(0),
+        max: this.getMapZ(this.maxMapDepth)
+      }
+    }
+  }
+
   createBorders () {
     let x = 0
     let y = 0

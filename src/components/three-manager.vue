@@ -14,9 +14,10 @@ export default {
     renderer: null,
     map: null,
     camera: null,
-    loopsPerSecond: 2,
+    loopsPerSecond: 5,
     initialized: false,
-    lastLoop: 0
+    lastLoop: 0,
+    gameover: false
   }),
   mounted () {
     if (!this.initialized) {
@@ -32,8 +33,10 @@ export default {
       this.camera.position.z = 8
       this.camera.position.y = 7
       this.camera.position.x = 3
+      this.camera.layers.enableAll()
       this.snake = new Snake()
       this.apple = new Apple()
+      this.apple.relocate()
       this.map.scene.add(this.snake.cameraHelper)
       this.renderer = new THREE.WebGLRenderer({ canvas: this.$refs.three })
       this.renderer.setSize(window.innerWidth, window.innerHeight)
@@ -48,18 +51,30 @@ export default {
     window.removeEventListener('keydown', this.handleKeyDown)
   },
   methods: {
-    onRender () {
-      this.renderer.render(this.map.scene, this.snake.camera)
+    onRender (data) {
+      const {
+        camera
+      } = data
+      this.renderer.render(this.map.scene, camera)
     },
     onLoop (time) {
-      const currLoop = Math.floor(time / (1000 / this.loopsPerSecond))
-      while (this.lastLoop < currLoop) {
-        this.lastLoop++
-        this.snake.onLogicLoop()
-      }
-      this.snake.onGraphicLoop()
-      this.onRender()
       requestAnimationFrame(this.onLoop)
+      if (!this.gameover) {
+        const currLoop = Math.floor(time / (1000 / this.loopsPerSecond))
+        while (this.lastLoop < currLoop) {
+          this.lastLoop++
+          try {
+            this.snake.onLogicLoop()
+          } catch (error) {
+            this.gameover = true
+            console.log(error)
+          }
+        }
+        this.snake.onGraphicLoop()
+        this.onRender({ camera: this.snake.camera })
+      } else {
+        this.onRender({ camera: this.camera })
+      }
     },
     handleResize () {
       this.renderer.setSize(
