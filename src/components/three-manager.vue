@@ -87,16 +87,26 @@ export default {
     },
     handleKeyDown (event) {
       switch (event.keyCode) {
-        case 38:
+        case 81: // Q
+          this.snake.requestRotation('L-spin')
+          break
+        case 69: // E
+          this.snake.requestRotation('R-spin')
+          break
+        case 38: // up-arrow
+        case 87: // W
           this.snake.requestRotation('up')
           break
-        case 40:
+        case 40: // down-arrow
+        case 83: // S
           this.snake.requestRotation('down')
           break
-        case 37:
+        case 37: // left-arrow
+        case 65: // A
           this.snake.requestRotation('left')
           break
-        case 39:
+        case 39: // right-arrow
+        case 68: // D
           this.snake.requestRotation('right')
           break
       }

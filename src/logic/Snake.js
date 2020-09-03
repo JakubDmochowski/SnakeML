@@ -68,6 +68,12 @@ class Snake {
   requestRotation (rotation) {
     this.requestedRotation = {}
     switch (rotation) {
+      case 'L-spin':
+        this.requestedRotation.spin = -Math.PI / 2
+        break
+      case 'R-spin':
+        this.requestedRotation.spin = Math.PI / 2
+        break
       case 'up':
         this.requestedRotation.angle = Math.PI / 2
         this.requestedRotation.perpendicular = true
@@ -83,6 +89,10 @@ class Snake {
       case 'right':
         this.requestedRotation.angle = -Math.PI / 2
         this.requestedRotation.perpendicular = false
+        break
+      default:
+        this.requestedRotation = null
+        console.log('Error: Unknown rotation key ', rotation)
         break
     }
   }
@@ -109,13 +119,20 @@ class Snake {
   }
 
   updateTarget (rotation) {
-    const { angle, perpendicular } = rotation
+    const { angle, perpendicular, spin = null } = rotation
     const head = this.getHead()
-    const vector = perpendicular ? this.direction.clone().cross(this.normal).normalize() : this.normal
-    this.rotation = new THREE.Quaternion().setFromAxisAngle(vector, angle).normalize()
-    this.targetNormal = this.roundVector3(perpendicular ? this.normal.clone().applyQuaternion(this.rotation) : this.normal)
-    this.targetDirection = this.roundVector3(this.direction.clone().applyQuaternion(this.rotation))
-    this.targetRotation = head.clone().applyQuaternion(this.rotation).quaternion
+    if (typeof perpendicular === 'boolean') {
+      const vector = perpendicular ? this.direction.clone().cross(this.normal).normalize() : this.normal
+      this.rotation = new THREE.Quaternion().setFromAxisAngle(vector, angle).normalize()
+      this.targetNormal = this.roundVector3(perpendicular ? this.normal.clone().applyQuaternion(this.rotation) : this.normal)
+      this.targetDirection = this.roundVector3(this.direction.clone().applyQuaternion(this.rotation))
+      this.targetRotation = head.clone().applyQuaternion(this.rotation).quaternion
+    } else if (spin) {
+      this.rotation = new THREE.Quaternion().setFromAxisAngle(this.direction, spin)
+      this.targetNormal = this.roundVector3(this.normal.clone().applyQuaternion(this.rotation))
+      this.targetRotation = head.clone().applyQuaternion(this.rotation).quaternion
+      this.targetDirection = this.direction
+    }
   }
 
   roundMatrix (matrix) {
