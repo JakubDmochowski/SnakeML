@@ -1,9 +1,12 @@
 import Apple from './Apple'
 import * as THREE from 'three'
 import Direction from './Direction'
+import uuid from 'uuid'
 
 class Snake {
   constructor (map) {
+    this._typename = 'Snake'
+    this.uuid = uuid()
     this.map = () => map
     this.camera = new THREE.PerspectiveCamera(
       90,
@@ -17,7 +20,7 @@ class Snake {
     this.cameraHelper.layers.disable(1)
     this.camera.updateProjectionMatrix()
     this.elements = []
-    this.maxSize = 4
+    this.maxSize = 14
     this.createSnakeElement()
     this.direction = Direction.up
     this.normal = Direction.backward
@@ -34,6 +37,51 @@ class Snake {
     this.map().scene.add(this.normalDirectionHelper)
     this.map().scene.add(this.directionHelper)
     this.map().scene.add(this.cameraHelper)
+    this.gains = {
+      Apple: 1
+    }
+    this.collidesWith = ['Wall', 'Snake', 'Apple']
+  }
+
+  clone () {
+    const newSnake = new Snake(this.map())
+    return newSnake.copy(this)
+  }
+
+  copy (snake) {
+    this.elements = snake.map().scene.children.filter(c => snake.elements.includes(c.uuid)).map(el => {
+      const newEl = el.clone()
+      snake.map().scene.add(newEl)
+      newEl.userData = {
+        ...newEl.userData,
+        snake: this,
+        uuid: newEl.uuid
+      }
+      return newEl.uuid
+    })
+    this.maxSize = snake.maxSize
+    this.normal = snake.normal
+    this.direction = snake.direction
+    this.targetDirection = snake.targetDirection
+    this.targetRotation = snake.targetRotation
+    this.rotation = snake.rotation
+    this.targetNormal = snake.targetNormal
+    this.requestedRotation = snake.requestedRotation
+    this.gains = JSON.parse(JSON.stringify(snake.gains))
+    this.collidesWith = [...snake.collidesWith]
+    return this
+  }
+
+  dispose () {
+    this.elements.forEach(uuid => {
+      const object = this.map().scene.getObjectByProperty('uuid', uuid)
+      object.geometry.dispose()
+      object.material.dispose()
+      this.map().scene.remove(object)
+      this.map().scene.remove(this.normalDirectionHelper)
+      this.map().scene.remove(this.directionHelper)
+      this.map().scene.remove(this.cameraHelper)
+    })
   }
 
   onResize () {
@@ -47,6 +95,7 @@ class Snake {
     var mesh = new THREE.Mesh(geometry, material)
     mesh.userData = {
       snake: this,
+      _typename: this._typename,
       uuid: mesh.uuid
     }
     if (matrix) {
@@ -105,17 +154,19 @@ class Snake {
     return this.map().scene.children.find(c => c.uuid === this.elements[index])
   }
 
-  checkCollision () {
+  getLength () {
+    return this.elements.length
+  }
+
+  getMaxSize () {
+    return this.maxSize
+  }
+
+  getCollisions () {
     const headPos = this.getHead().position
-    const collisions = this.map().scene.children.filter(c => c.position.equals(headPos) && c.uuid !== this.elements[0])
-    if (collisions.length) {
-      if (collisions[0].userData instanceof Apple) {
-        collisions[0].userData.relocate()
-        this.maxSize += 3
-      } else {
-        throw Error('gameOver')
-      }
-    }
+    return this.map().scene.children
+      .filter(c => c.position.equals(headPos) && c.uuid !== this.elements[0])
+      .filter(c => this.collidesWith.includes(c.userData._typename))
   }
 
   updateTarget (rotation) {
@@ -128,7 +179,7 @@ class Snake {
       this.targetDirection = this.roundVector3(this.direction.clone().applyQuaternion(this.rotation))
       this.targetRotation = head.clone().applyQuaternion(this.rotation).quaternion
     } else if (spin) {
-      this.rotation = new THREE.Quaternion().setFromAxisAngle(this.direction, spin)
+      this.rotation = new THREE.Quaternion().setFromAxisAngle(this.direction, spin).normalize()
       this.targetNormal = this.roundVector3(this.normal.clone().applyQuaternion(this.rotation))
       this.targetRotation = head.clone().applyQuaternion(this.rotation).quaternion
       this.targetDirection = this.direction
@@ -149,7 +200,7 @@ class Snake {
     )
   }
 
-  onLoop () {
+  updateRotation () {
     if (this.targetDirection) {
       this.direction = this.targetDirection
       this.normal = this.targetNormal
@@ -162,6 +213,15 @@ class Snake {
       this.updateTarget(this.requestedRotation)
       this.requestedRotation = null
     }
+  }
+
+  onLoop () {
+    this.updateRotation()
+    this.move()
+    this.handleCollisions()
+  }
+
+  move () {
     const head = this.getHead()
     var nextPos = this.roundMatrix(
       new THREE.Matrix4()
@@ -185,10 +245,24 @@ class Snake {
     if (this.elements.length < this.maxSize) {
       this.createSnakeElement(prevPos)
     }
-    this.checkCollision()
   }
 
-  move () {
+  handleCollisions () {
+    const collisions = this.getCollisions().filter(c => !(
+      c.userData._typename === 'Snake' &&
+      c.userData.snake.uuid !== this.getHead().userData.snake.uuid
+    ))
+    if (collisions.length) {
+      if (collisions[0].userData instanceof Apple) {
+        collisions[0].userData.relocate()
+        this.maxSize += this.gains.Apple
+      } else {
+        throw Error('gameOver')
+      }
+    }
+  }
+
+  rotateHead () {
     if (this.targetDirection) {
       const head = this.getHead()
       const angle = head.quaternion.angleTo(this.targetRotation)
@@ -220,7 +294,7 @@ class Snake {
   }
 
   onRender () {
-    this.move()
+    this.rotateHead()
     this.updateCamera()
   }
 }

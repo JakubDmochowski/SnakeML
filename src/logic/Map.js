@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import Wall from './Wall'
 
 class Map {
   constructor (width, height, depth) {
@@ -38,6 +39,10 @@ class Map {
     }
   }
 
+  getSize () {
+    return new THREE.Vector3(this.maxMapWidth, this.maxMapHeight, this.maxMapDepth)
+  }
+
   createBorders () {
     let x = 1
     let y = 1
@@ -47,20 +52,18 @@ class Map {
         for (z = 1; z < this.maxMapDepth; z++) {
           if (x === 1 || y === 1 || z === 1 || y === this.maxMapHeight - 1 || x === this.maxMapWidth - 1 || z === this.maxMapDepth - 1) {
             if (!((x + y + z) % 6)) {
-              const geometry = new THREE.BoxGeometry()
-              const material = new THREE.MeshBasicMaterial({
-                color: new THREE.Color(
-                  x * this.maxMapWidth / 255,
-                  y * this.maxMapHeight / 255,
-                  z * this.maxMapDepth / 255
-                ),
-                wireframe: true
-              })
-              const wall = new THREE.Mesh(geometry, material)
-              wall.position.x = this.getMapX(x)
-              wall.position.y = this.getMapY(y)
-              wall.position.z = this.getMapZ(z)
-              this.scene.add(wall)
+              this.scene.add(
+                new Wall(
+                  new THREE.Color(
+                    x * this.maxMapWidth / 255,
+                    y * this.maxMapHeight / 255,
+                    z * this.maxMapDepth / 255
+                  ),
+                  this.getMapX(x),
+                  this.getMapY(y),
+                  this.getMapZ(z)
+                ).getMesh()
+              )
             }
           }
         }
